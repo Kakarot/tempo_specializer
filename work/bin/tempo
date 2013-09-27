@@ -1,0 +1,93 @@
+#!/bin/csh
+
+# This command
+set this_cmd=`basename $0`
+
+#--------------------------------
+# Set TEMPOHOME
+#--------------------------------
+# Relative path to this shell
+set this_dir_rel=`dirname $0`
+
+# Absolute path to this shell
+set this_dir_abs=`(cd $this_dir_rel; pwd)`
+setenv TEMPOHOME  $this_dir_abs/..
+
+#--------------------------------
+# Set TEMPOWORK if undefined
+#--------------------------------
+if ($?TEMPOWORK != 1) then
+	setenv TEMPOWORK `pwd`
+endif
+
+#--------------------------------
+# Set SMLPATH if undefined
+#--------------------------------
+if ($?SML_PATH != 1) then
+	setenv SML_PATH /usr/bin/sml
+endif
+
+#-------------------------------
+# Set SYSTEM if undefined
+# NB: This needs to be kept in sync w/ the bin/tempo script
+#-------------------------------
+if ($?SYSTEM != 1) then
+    set SYSTEM = `uname -s -r | sed -e 's/ /-/g' -e 's/\..*//' | tr -d \\012`
+    set SYSTEM = `$TEMPOHOME/bin/arch-n-opsys`
+endif
+setenv MACHINE $SYSTEM
+
+set ARCH   = `uname -m`
+set OS     = `uname -s`
+set OS_REV = `uname -r | sed -e 's/ /-/g' -e 's/\..*//'`
+
+#--------------------------------
+# Specific env for system
+#--------------------------------
+set gccpath=`which gmake|tail -1|perl -pe 's|^.*?((/[a-zA-Z0-9_-]*)*)$|$1|'`
+
+if ($OS == "Linux") then
+    setenv OBJDUMP_PATH $TEMPOHOME/objdump
+else if ($OS == "SunOS") then
+    # Access to Gnu make
+    setenv GNUPATH `dirname $gccpath`
+else
+    echo 'Tempo on ' $SYSTEM ' not supported'
+    exit(1)
+endif
+
+#--------------------------------
+# Set SUIFHOME
+#--------------------------------
+if ($?TEMPOSUIFHOME == 1) then
+	setenv SUIFHOME $TEMPOSUIFHOME
+else
+	setenv SUIFHOME  $TEMPOHOME/suif
+endif
+setenv SUIFPATH  $SUIFHOME/$MACHINE/bin
+
+if (`echo $path | grep -c $SUIFPATH` == 0) \
+        set path=($SUIFPATH ${path})
+endif
+
+# Access to old library for an old sml version
+if ($OS == "Linux") then
+    if ($?LD_LIBRARY_PATH == 1) then
+	setenv LD_LIBRARY_PATH $TEMPOHOME/bin/${SYSTEM}:${SUIFPATH}:${SUIFPATH}/../solib:${OBJDUMP_PATH}:${LD_LIBRARY_PATH}
+    else
+	setenv LD_LIBRARY_PATH $TEMPOHOME/bin/${SYSTEM}:${SUIFPATH}:${SUIFPATH}/../solib:${OBJDUMP_PATH}
+    endif
+endif
+
+#------------------------------
+# Lancement de tempo
+#------------------------------
+
+# Possible SML image argument
+if ($#argv == 0) then
+    set sml_image=$TEMPOHOME/bin/$SYSTEM/$this_cmd
+else
+    set sml_image=$1
+endif
+
+$SML_PATH @SMLload=$sml_image

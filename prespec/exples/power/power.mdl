@@ -1,0 +1,6 @@
+Module power {
+  Defines {
+    From power.c {
+      Btpower :: intern  power(D(int)base, S(int)expon) 
+      { inits { expon = f() From init.c;}}; }}
+  Exports { Btpower; }}

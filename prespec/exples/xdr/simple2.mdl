@@ -1,0 +1,46 @@
+Module simple2 {
+  Defines {
+    From simple2.c {
+      Btxdr_ops :: struct xdr_ops {
+	S(* x_getlong) ();
+	S(* x_putlong) ();
+      };
+      BtXDR :: struct XDR {
+	S(int) x_op;
+	Btxdr_ops(struct xdr_ops) S(*) x_ops;
+	D(char *) x_public;   
+	D(char) S(*) x_private;
+	D(char) S(*) x_base;
+	S(int) x_handy;
+      };
+      Btgetlong :: intern xdrmem_getlong (BtXDR(struct XDR) S(*) xdrs, D(long *) lp)
+      { needs {  Btntohl;  }};
+      Btntohl :: extern ntohl(D(long) x);
+      Bthtonl :: extern htonl(D(long) x);
+      Btputlong :: intern xdrmem_putlong (BtXDR(struct XDR) S(*) xdrs, D(long *) lp)
+      { needs {  Bthtonl;  }};
+      BtXdrmem_ops :: Btxdr_ops(struct  xdr_ops) xdrmem_ops
+	{needs {Btputlong; Btgetlong;}
+         inits {x_getlong = none; x_putlong = none;}
+        } ; 
+      Btshort :: intern xdr_short(BtXDR(struct XDR) S(*) xdrs, D(short *) sp);
+      Btlong :: intern xdr_long (BtXDR(struct XDR) S(*) xdrs, D(long *) lp);
+      Btint :: intern xdr_int(BtXDR(struct XDR) S(*) xdrs, D(int *) ip)
+      { needs { Btshort; Btlong; }};
+      Btcreate :: intern xdrmem_create (BtXDR(struct XDR) S(*) xdrs, D(char) S(*) addr, S(int) size, S(int) op)
+     { needs { BtXdrmem_ops;  }};
+     Btdecode :: intern decode(S(char *) addr, BtXDR(struct XDR) S(*) xdrs, D(int *) number)
+      { needs { Btcreate; Btint;  }};
+      Btencode :: intern encode(D(char) S(*) addr, BtXDR(struct XDR) S(*) xdrs, D(int) number)
+      { needs { Btcreate; Btint;  }
+        inits { addr = none; xdrs = none; }
+	};
+      Bttest :: intern test (S(char *) addr, BtXDR(struct XDR) S(*) xdrs, D(int) number) 
+      { needs { Btencode; Btdecode; }};
+    }
+  }
+  Exports {
+    Bttest; Btencode; Btdecode;
+  }
+}
+

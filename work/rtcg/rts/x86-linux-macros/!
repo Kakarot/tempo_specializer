@@ -1,0 +1,197 @@
+/*
+** Tempo, copyright (C) Irisa 95
+**
+** file/version: @(#)@(#)$Id: rts.skel.macros.x86.c,v 1.20 2000/07/08 13:59:11 chang Exp $
+** author(s):    F. Noel P. Boinot
+** date:         $Date: 2000/07/08 13:59:11 $
+*/
+#define _SIZE_T
+typedef unsigned int	size_t;
+#include <malloc.h>
+/* These files cause duplicate definitions if the program specialized includes
+   the same header files. */
+/*
+#include <sys/types.h>
+#include <stdio.h>
+*/
+
+#define ENTRIES_PER_NODE 32
+typedef struct temp_list_s {
+  int no;
+  char *entry[ENTRIES_PER_NODE];
+  struct temp_list_s *next,*hnext;
+} list_t;
+
+static list_t *templists=0;
+
+
+/*-----------------------------------------------------------------------
+**  Recopie d'un template. L'adresse d'implatation est memorisee dans le
+**  pointeur de relocation du template. La nullite de ce dernier indique
+**  si le template a ete implante (indispensable pour la relocation des
+**  branchements avantsi).
+-----------------------------------------------------------------------*/
+/*
+void dump_line(char *pt_code)
+{
+  int i;
+  printf ("%x : ",pt_code);
+  for (i=0;i<20;i++) printf ("%x ",*((unsigned char *) (pt_code+i)));
+  printf ("\n");
+}
+
+*/
+#define DUMP_TEMPLATE(code_ptr, tmp_ptr, name, size)\
+{\
+  memcpy(code_ptr,name,size);\
+  tmp_ptr   = code_ptr;\
+  code_ptr += size;\
+}
+
+#define DUMP_TEMPLATE_MP(code_ptr, tmp_lst_ptr, tmp_ptr, name, size)\
+{\
+  if (tmp_ptr) ins_temp((list_t **) &tmp_lst_ptr,tmp_ptr); \
+  memcpy(code_ptr,name,size);\
+  tmp_ptr   = code_ptr;\
+  code_ptr += size;\
+}
+/*-----------------------------------------------------------------------
+**    Patche un trou
+-----------------------------------------------------------------------*/
+#define PATCH_HOLE_UNDEFINED(tmp_ptr, e, ho, lo, of)\
+{\
+ *((int *) (tmp_ptr+ho))=e+of;\
+}
+
+#define PATCH_HOLE_BYTE(tmp_ptr, e, ho, lo, of)\
+{\
+ *((char *) (tmp_ptr+ho))=e+of;\
+}
+
+#define PATCH_HOLE_WORD(tmp_ptr, e, ho, lo, of)\
+{\
+ *((short *) (tmp_ptr+ho))=e+of;\
+}
+
+#define PATCH_HOLE_DWORD(tmp_ptr, e, ho, lo, of)\
+{\
+ *((int *) (tmp_ptr+ho))=e+of;\
+}
+
+/*----------------------------------------------------------------------
+**  Patche un trou d'appel  (+4 i.e. taille trou)
+
+----------------------------------------------------------------------*/
+
+#define PATCH_CALL_HOLE(tmp_ptr, e, ho) { *((unsigned long *) (tmp_ptr+ho))=(e-(unsigned long) (tmp_ptr+ho+4));}
+
+/*----------------------------------------------------------------------
+**  Relocation d'un appel de bibliotheque
+----------------------------------------------------------------------*/
+#define PATCH_LIB_CALL(tmp_ptr,name,offset) { *((unsigned long *) (tmp_ptr+offset))=((unsigned long) (*((unsigned long *) (tmp_ptr+offset))+ ((char *)name-tmp_ptr)));}
+
+
+/*----------------------------------------------------------------------
+**  Relocation d'un branchement intertemplate.
+**  La deuxieme macro doit etre utilisee pour un branchement avant car
+**  il convient de tester si le brancheur a ete implante avant
+**  de patcher!!!
+-----------------------------------------------------------------------*/
+
+#define PATCH_BRANCH_BYTE(stmp_ptr, bo, rtmp_ptr, to)\
+{\
+ *(char *)(stmp_ptr+bo)=(rtmp_ptr-stmp_ptr)+(to-(bo+1));\
+}
+
+#define BACK_PATCH_BRANCH_BYTE PATCH_BRANCH_BYTE
+#define BACK_PATCH_BRANCH_BYTE_MP(stmp_lst,stmp_ptr,bo,rtmp_ptr,to) \
+{\
+  back_patch_lst_byte((list_t *) stmp_lst,bo,rtmp_ptr,to); \
+ *(char *)(stmp_ptr+bo)=(rtmp_ptr-stmp_ptr)+(to-(bo+1));\
+}
+
+#define BACK_PATCH_BRANCH_BYTE_COND(stmp_ptr, bo, rtmp_ptr, to)\
+{\
+  if ( stmp_ptr ) PATCH_BRANCH_BYTE(stmp_ptr, bo, rtmp_ptr, to);\
+}
+#define BACK_PATCH_BRANCH_BYTE_COND_MP(stmp_ptr, bo, rtmp_ptr, to)\
+{\
+  if ( stmp_ptr ) PATCH_BRANCH_BYTE_MP(stmp_ptr, bo, rtmp_ptr, to);\
+}
+
+#define PATCH_BRANCH_DWORD(stmp_ptr, bo, rtmp_ptr, to)\
+{\
+ *(unsigned int *)(stmp_ptr+bo)=(rtmp_ptr-stmp_ptr)+(to-(bo+4));\
+}
+
+#define BACK_PATCH_BRANCH_DWORD PATCH_BRANCH_DWORD
+#define BACK_PATCH_BRANCH_DWORD_MP(stmp_lst, stmp_ptr, bo, rtmp_ptr, to)\
+{\
+  back_patch_lst_dword((list_t *) stmp_lst,bo,rtmp_ptr,to); \
+ *(unsigned int *)(stmp_ptr+bo)=(rtmp_ptr-stmp_ptr)+(to-(bo+4));\
+}
+
+#define BACK_PATCH_BRANCH_DWORD_COND(stmp_ptr, bo, rtmp_ptr, to)\
+{\
+  if ( stmp_ptr ) PATCH_BRANCH_DWORD(stmp_ptr, bo, rtmp_ptr, to);\
+}
+#define BACK_PATCH_BRANCH_DWORD_COND_MP(stmp_ptr, bo, rtmp_ptr, to)\
+{\
+  if ( stmp_ptr ) PATCH_BRANCH_DWORD_MP(stmp_ptr, bo, rtmp_ptr, to);\
+}
+
+static void ins_temp(list_t **l, char *temp_ptr)
+
+{
+  list_t *node;
+
+  if ((*l)&&((*l)->no<ENTRIES_PER_NODE)) {
+    (*l)->entry[(*l)->no]=temp_ptr;
+    (*l)->no++;
+  } else {
+    node=malloc(sizeof(list_t));
+    node->entry[0]=temp_ptr;
+    node->no=1;
+    node->next=*l;
+    *l=node;
+    node->hnext=templists;
+    templists=node;
+  }
+}
+
+static void back_patch_lst_byte(list_t *l, int bo, char *rtmp_ptr, int to)
+
+{
+  int i;
+
+  while (l) {
+    for (i=0; i<l->no; i++) {
+      BACK_PATCH_BRANCH_BYTE(l->entry[i], bo, rtmp_ptr, to);
+    }
+    l=l->next;
+  }
+}
+
+static void back_patch_lst_dword(list_t *l, int bo, char *rtmp_ptr, int to)
+
+{
+  int i;
+
+  while (l) {
+    for (i=0; i<l->no; i++) {
+      BACK_PATCH_BRANCH_DWORD(l->entry[i], bo, rtmp_ptr, to);
+    }
+    l=l->next;
+  }
+}
+
+void rtcg_cleanup()
+
+{
+  list_t *junk;
+  while (templists) {
+    junk=templists;
+    templists=templists->hnext;
+    free(junk);
+  }
+}

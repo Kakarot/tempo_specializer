@@ -1,0 +1,14 @@
+Module dotproduct {
+
+  Defines {
+    From dot.c {
+      Btvector :: struct vector { S(int) size; D(int) vec D([]);};
+      Btperror :: extern perror(D(char *) mess);
+      Btdotproduct :: intern dotproduct(Btvector(struct vector) S(*) v, Btvector(struct vector) S(*) u)
+      { needs { Btperror;}}; }
+    }
+
+  Exports {
+    Btdotproduct;
+  }
+}
